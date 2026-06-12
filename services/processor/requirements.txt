@@ -1,0 +1,16 @@
+kafka-python==2.0.2
+spacy==3.8.14
+keybert==0.8.4
+sentence-transformers==2.7.0
+faiss-cpu==1.8.0
+scikit-learn==1.5.0
+elasticsearch==8.13.0
+sqlalchemy==2.0.29
+psycopg2-binary==2.9.9
+pydantic==2.7.1
+pydantic-settings==2.2.1
+loguru==0.7.2
+numpy==1.26.4
+opentelemetry-api==1.24.0
+opentelemetry-sdk==1.24.0
+opentelemetry-exporter-otlp==1.24.0
