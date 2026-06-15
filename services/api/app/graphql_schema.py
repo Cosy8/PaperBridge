@@ -2,22 +2,22 @@
 GraphQL API using Strawberry.
 Exposes article search and recommendations via a typed graph.
 """
+
 import strawberry
 from strawberry.fastapi import GraphQLRouter
-from typing import Optional
 
 
 @strawberry.type
 class ArticleType:
     id: str
     title: str
-    abstract: Optional[str]
+    abstract: str | None
     authors: list[str]
     keywords: list[str]
-    year: Optional[int]
-    venue: Optional[str]
+    year: int | None
+    venue: str | None
     citations: int
-    url: Optional[str]
+    url: str | None
 
 
 @strawberry.type
@@ -37,8 +37,8 @@ class Query:
         method: str = "hybrid",
     ) -> list[RecommendationType]:
         """Get article recommendations for a query string."""
-        from app.services.recommender import get_recommendations
         from app.schemas.recommendation import RecommendationRequest
+        from app.services.recommender import get_recommendations
         results = await get_recommendations(
             request=RecommendationRequest(query_text=query_text),
             top_k=top_k,

@@ -1,7 +1,9 @@
 import json
+
 from kafka import KafkaProducer
-from app.config import settings
 from loguru import logger
+
+from app.config import settings
 
 
 def get_producer() -> KafkaProducer:

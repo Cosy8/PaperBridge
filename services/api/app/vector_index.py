@@ -1,9 +1,11 @@
 """FAISS index client shared by API and recommender service."""
 import json
 import os
-import numpy as np
+
 import faiss
+import numpy as np
 from loguru import logger
+
 from app.config import settings
 
 _faiss_index = None
@@ -36,7 +38,7 @@ class FAISSIndex:
         distances, indices = self.index.search(vec, min(top_k, self.index.ntotal))
         return [
             (self.id_map[idx], float(dist))
-            for dist, idx in zip(distances[0], indices[0])
+            for dist, idx in zip(distances[0], indices[0], strict=False)
             if idx != -1 and idx < len(self.id_map)
         ]
 

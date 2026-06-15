@@ -1,8 +1,6 @@
 """Article CRUD and ingestion endpoints."""
-from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
-from app.db.session import get_db
 
 router = APIRouter()
 

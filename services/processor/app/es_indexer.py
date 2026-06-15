@@ -1,6 +1,7 @@
 """Elasticsearch indexing for full-text and keyword search."""
 from elasticsearch import Elasticsearch
 from loguru import logger
+
 from app.config import settings
 
 INDEX_MAPPING = {

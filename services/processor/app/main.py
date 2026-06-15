@@ -2,12 +2,14 @@
 Processor service: Kafka consumer → NLP pipeline → ES + FAISS indexing.
 """
 import json
+
 from kafka import KafkaConsumer
 from loguru import logger
+
 from app.config import settings
+from app.es_indexer import ensure_index, get_es_client, index_article
 from app.nlp_pipeline import process_article
 from app.vector_index import get_faiss_index
-from app.es_indexer import get_es_client, ensure_index, index_article
 
 
 def main():

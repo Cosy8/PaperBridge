@@ -2,10 +2,7 @@
 Tests for the NLP processing pipeline.
 Tests keyword extraction, entity recognition, and embedding generation.
 """
-import pytest
 import numpy as np
-from unittest.mock import patch, MagicMock
-
 
 SAMPLE_ABSTRACT = """
 We introduce BERT, a new language representation model which stands for Bidirectional Encoder

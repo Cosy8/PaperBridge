@@ -1,7 +1,9 @@
 """Full-text search endpoint backed by Elasticsearch."""
-from fastapi import APIRouter, Query
 from typing import Annotated
+
 from elasticsearch import Elasticsearch
+from fastapi import APIRouter, Query
+
 from app.config import settings
 
 router = APIRouter()

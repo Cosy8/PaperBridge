@@ -3,16 +3,17 @@ PaperBridge FastAPI application.
 Provides REST and GraphQL endpoints for article recommendations.
 """
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_fastapi_instrumentator import Instrumentator
 from loguru import logger
+from prometheus_fastapi_instrumentator import Instrumentator
 
-from app.routers import articles, recommendations, search, health
-from app.graphql_schema import graphql_router
 from app.config import settings
-from app.db.session import engine
 from app.db import models
+from app.db.session import engine
+from app.graphql_schema import graphql_router
+from app.routers import articles, health, recommendations, search
 
 
 @asynccontextmanager

@@ -2,17 +2,18 @@
 NLP Pipeline: keyword extraction + semantic embedding generation.
 Uses KeyBERT for keyword extraction and sentence-transformers for embeddings.
 """
-from typing import Optional
-import spacy
+
 import numpy as np
+import spacy
 from keybert import KeyBERT
-from sentence_transformers import SentenceTransformer
 from loguru import logger
+from sentence_transformers import SentenceTransformer
+
 from app.config import settings
 
-_nlp: Optional[spacy.Language] = None
-_kw_model: Optional[KeyBERT] = None
-_embed_model: Optional[SentenceTransformer] = None
+_nlp: spacy.Language | None = None
+_kw_model: KeyBERT | None = None
+_embed_model: SentenceTransformer | None = None
 
 
 def get_nlp() -> spacy.Language:

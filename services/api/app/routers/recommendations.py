@@ -3,18 +3,18 @@ Recommendation endpoints.
 Hybrid ranking: semantic (FAISS) + keyword (Elasticsearch) scores combined.
 Results are cached in Redis for performance.
 """
-import json
 import hashlib
+import json
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-import redis as redis_lib
-import numpy as np
 
-from app.db.session import get_db
+import redis as redis_lib
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
+
 from app.config import settings
+from app.db.session import get_db
+from app.schemas.recommendation import RecommendationRequest, RecommendationResponse
 from app.services.recommender import get_recommendations
-from app.schemas.recommendation import RecommendationResponse, RecommendationRequest
 
 router = APIRouter()
 

@@ -14,8 +14,9 @@ def ingest_article_task(self, request: dict):
     """
     try:
         from scholarly import scholarly
+
+        from app.es_indexer import ensure_index, get_es_client, index_article
         from app.nlp_pipeline import process_article
-        from app.es_indexer import get_es_client, ensure_index, index_article
         from app.vector_index import get_faiss_index
 
         logger.info(f"Ingesting: {request}")
@@ -57,7 +58,7 @@ def ingest_article_task(self, request: dict):
 
     except Exception as exc:
         logger.error(f"Ingest task failed: {exc}")
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc
 
 
 @shared_task

@@ -1,3 +1,91 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  /* Surfaces — true off-white, a hair cool, never warm-cream */
+  --bg: oklch(0.99 0.002 250);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.975 0.004 250);
+
+  /* Ink ramp — verified ≥4.5:1 on --bg */
+  --ink: oklch(0.24 0.012 255);
+  --muted: oklch(0.46 0.012 255);
+  --faint: oklch(0.62 0.01 255);
+
+  --border: oklch(0.91 0.005 255);
+  --border-strong: oklch(0.84 0.006 255);
+
+  /* One accent — deep emerald. -ink variant for text on light. */
+  --accent: oklch(0.55 0.12 165);
+  --accent-hover: oklch(0.49 0.12 165);
+  --accent-ink: oklch(0.44 0.11 165);
+  --accent-soft: oklch(0.96 0.03 165);
+  --accent-ring: oklch(0.7 0.1 165);
+
+  --radius: 12px;
+  --radius-sm: 8px;
+
+  /* Semantic z-index scale */
+  --z-sticky: 100;
+  --z-tooltip: 400;
+
+  --shadow-card: 0 1px 2px oklch(0.24 0.012 255 / 0.04),
+    0 4px 12px oklch(0.24 0.012 255 / 0.05);
+}
+
+@layer base {
+  body {
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Visible, consistent focus for keyboard users */
+  :focus-visible {
+    outline: 2px solid var(--accent-ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::placeholder {
+    color: var(--faint);
+  }
+}
+
+@layer utilities {
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .line-clamp-4 {
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

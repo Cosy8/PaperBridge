@@ -1,7 +1,9 @@
 """Tests for the search endpoint."""
+from unittest.mock import MagicMock, patch
+
 import pytest
-from httpx import AsyncClient, ASGITransport
-from unittest.mock import patch, MagicMock
+from httpx import ASGITransport, AsyncClient
+
 from app.main import app
 
 

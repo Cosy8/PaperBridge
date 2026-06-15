@@ -4,11 +4,11 @@ Combines semantic similarity (FAISS) and keyword match (Elasticsearch)
 using reciprocal rank fusion for robust ranking.
 """
 from __future__ import annotations
-import numpy as np
-from loguru import logger
-from sqlalchemy.orm import Session
+
 from elasticsearch import Elasticsearch
+from loguru import logger
 from sentence_transformers import SentenceTransformer
+from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.schemas.recommendation import RecommendationRequest, RecommendationResponse

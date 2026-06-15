@@ -1,12 +1,13 @@
 """Tests for FAISS vector index operations."""
-import pytest
+from unittest.mock import patch
+
 import numpy as np
-from unittest.mock import patch, MagicMock
 
 
 class TestFAISSIndex:
     def test_search_returns_empty_when_no_vectors(self):
         import faiss
+
         from app.vector_index import FAISSIndex
 
         with patch("app.vector_index.settings") as mock_settings, \
@@ -23,6 +24,7 @@ class TestFAISSIndex:
 
     def test_bulk_add_and_search(self):
         import faiss
+
         from app.vector_index import FAISSIndex
 
         with patch("app.vector_index.settings") as mock_settings, \

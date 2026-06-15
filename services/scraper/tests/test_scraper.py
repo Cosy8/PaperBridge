@@ -1,5 +1,4 @@
 """Tests for the Kafka producer and article scraper."""
-import pytest
 from unittest.mock import MagicMock, patch
 
 

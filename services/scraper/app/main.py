@@ -1,4 +1,5 @@
 from loguru import logger
+
 from app.producer import get_producer, publish_raw_article
 from app.scholar_scraper import fetch_articles, setup_proxy
 

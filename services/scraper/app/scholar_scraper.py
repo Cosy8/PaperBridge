@@ -1,8 +1,10 @@
 import time
-from typing import Generator
-from scholarly import scholarly, ProxyGenerator
-from tenacity import retry, stop_after_attempt, wait_exponential
+from collections.abc import Generator
+
 from loguru import logger
+from scholarly import ProxyGenerator, scholarly
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from app.config import settings
 
 

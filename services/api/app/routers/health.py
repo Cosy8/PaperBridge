@@ -1,8 +1,9 @@
+import redis
 from fastapi import APIRouter
 from sqlalchemy import text
-from app.db.session import SessionLocal
+
 from app.config import settings
-import redis
+from app.db.session import SessionLocal
 
 router = APIRouter()
 

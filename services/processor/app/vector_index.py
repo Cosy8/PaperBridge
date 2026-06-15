@@ -4,11 +4,12 @@ Uses IVFFlat for efficient approximate nearest neighbor search at scale.
 """
 import json
 import os
-import numpy as np
-import faiss
-from loguru import logger
-from app.config import settings
 
+import faiss
+import numpy as np
+from loguru import logger
+
+from app.config import settings
 
 # IVFFlat needs at least this many training vectors (one per cluster) before it
 # can be trained. Below this threshold we use an exact IndexFlatIP, which needs
@@ -85,7 +86,7 @@ class FAISSIndex:
             self.index.nprobe = 10  # Search 10 nearest clusters
         distances, indices = self.index.search(vec, top_k)
         results = []
-        for dist, idx in zip(distances[0], indices[0]):
+        for dist, idx in zip(distances[0], indices[0], strict=False):
             if idx != -1 and idx < len(self.id_map):
                 results.append((self.id_map[idx], float(dist)))
         return results
