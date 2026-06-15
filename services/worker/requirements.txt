@@ -1,11 +1,13 @@
 celery==5.4.0
 redis==5.0.4
 kafka-python==2.0.2
-scholarly==1.7.11
+requests==2.32.3
+tenacity==8.3.0
 spacy==3.8.14
 keybert==0.8.4
 sentence-transformers==2.7.0
 faiss-cpu==1.8.0
+numpy==1.26.4
 elasticsearch==8.13.0
 sqlalchemy==2.0.29
 psycopg2-binary==2.9.9

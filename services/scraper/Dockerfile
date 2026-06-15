@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # ── Builder ─────────────────────────────────────────────────────
-# scholarly queries Scholar over HTTP — no browser engine needed, so chromium
+# Queries the Semantic Scholar HTTP API — no browser engine needed, so chromium
 # and playwright are gone. All remaining deps ship as wheels (no compiler).
 FROM python:3.11-slim AS builder
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1

@@ -13,31 +13,15 @@ def ingest_article_task(self, request: dict):
     Steps: scrape → NLP process → ES index → FAISS index
     """
     try:
-        from scholarly import scholarly
-
         from app.es_indexer import ensure_index, get_es_client, index_article
         from app.nlp_pipeline import process_article
+        from app.semantic_scholar import fetch_article
         from app.vector_index import get_faiss_index
 
         logger.info(f"Ingesting: {request}")
 
-        # 1. Scrape
-        article = None
-        if request.get("query"):
-            results = scholarly.search_pubs(request["query"])
-            raw = next(results, None)
-            if raw:
-                filled = scholarly.fill(raw)
-                article = {
-                    "title": filled.get("bib", {}).get("title"),
-                    "abstract": filled.get("bib", {}).get("abstract"),
-                    "authors": filled.get("bib", {}).get("author", []),
-                    "year": filled.get("bib", {}).get("pub_year"),
-                    "citations": filled.get("num_citations", 0),
-                    "url": filled.get("pub_url"),
-                    "scholar_id": filled.get("scholar_id"),
-                    "doi": filled.get("externalids", {}).get("DOI"),
-                }
+        # 1. Fetch from Semantic Scholar (by DOI if given, else query search)
+        article = fetch_article(request)
 
         if not article:
             return {"status": "skipped", "reason": "no article found"}

@@ -3,6 +3,7 @@ PaperBridge Airflow DAG: Daily article ingestion pipeline.
 
 Orchestrates: seed query scraping → Kafka publish → processor trigger → index validation
 """
+import os
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -16,24 +17,74 @@ DEFAULT_ARGS = {
     "retry_delay": timedelta(minutes=5),
 }
 
-SEED_QUERIES = [
-    "large language models 2024",
-    "graph neural networks recommendation",
-    "transformer architecture attention",
-    "retrieval augmented generation",
-    "contrastive learning self-supervised",
-    "diffusion models image generation",
-    "federated learning privacy",
-    "knowledge graph embedding",
-]
+# Comma-separated search queries to ingest, supplied via env. Empty by default —
+# no seeded data. Set SEED_QUERIES (e.g. "query one,query two") to enable.
+SEED_QUERIES = [q.strip() for q in os.getenv("SEED_QUERIES", "").split(",") if q.strip()]
+
+
+S2_FIELDS = "title,abstract,authors,year,venue,citationCount,externalIds,url,paperId"
+S2_SEARCH_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
+
+
+class _RateLimited(Exception):
+    """Raised on HTTP 429 so tenacity retries with a long, header-aware backoff."""
+
+
+def _search_page(query: str, offset: int, limit: int) -> dict:
+    """One Semantic Scholar search page with 429-aware retry.
+
+    Mirrors the scraper/worker clients (separate images can't share a module).
+    """
+    import os
+    import time
+
+    import requests
+    from tenacity import (
+        retry,
+        retry_if_exception_type,
+        stop_after_attempt,
+        wait_exponential,
+    )
+
+    headers = {}
+    api_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
+    if api_key:
+        headers["x-api-key"] = api_key
+
+    @retry(
+        retry=retry_if_exception_type(_RateLimited),
+        stop=stop_after_attempt(6),
+        wait=wait_exponential(multiplier=2, min=5, max=60),
+        reraise=True,
+    )
+    def _do() -> dict:
+        resp = requests.get(
+            S2_SEARCH_URL,
+            params={"query": query, "fields": S2_FIELDS, "offset": offset, "limit": limit},
+            headers=headers,
+            timeout=30,
+        )
+        if resp.status_code == 429:
+            retry_after = resp.headers.get("Retry-After")
+            if retry_after:
+                try:
+                    time.sleep(min(float(retry_after), 60))
+                except ValueError:
+                    pass
+            print(f"Rate limited (429) on '{query}' @ offset {offset}; retrying")
+            raise _RateLimited()
+        resp.raise_for_status()
+        return resp.json()
+
+    return _do()
 
 
 def scrape_and_publish(query: str, **context):
-    """Scrape Scholar for a query and publish to Kafka."""
+    """Search Semantic Scholar for a query and publish results to Kafka."""
     import json
     import time
+
     from kafka import KafkaProducer
-    from scholarly import scholarly
 
     producer = KafkaProducer(
         bootstrap_servers="kafka:9092",
@@ -41,28 +92,42 @@ def scrape_and_publish(query: str, **context):
     )
 
     count = 0
-    for result in scholarly.search_pubs(query):
+    offset = 0
+    limit = 20  # cap per query per run
+    while count < limit:
         try:
-            filled = scholarly.fill(result)
+            payload = _search_page(query, offset, limit - count)
+        except Exception as e:
+            print(f"Search request failed: {e}")
+            break
+
+        papers = payload.get("data") or []
+        if not papers:
+            break
+
+        for paper in papers:
+            external_ids = paper.get("externalIds") or {}
+            authors = [a.get("name") for a in (paper.get("authors") or []) if a.get("name")]
             article = {
-                "title": filled.get("bib", {}).get("title"),
-                "abstract": filled.get("bib", {}).get("abstract"),
-                "authors": filled.get("bib", {}).get("author", []),
-                "year": filled.get("bib", {}).get("pub_year"),
-                "citations": filled.get("num_citations", 0),
-                "url": filled.get("pub_url"),
-                "scholar_id": filled.get("scholar_id"),
-                "doi": filled.get("externalids", {}).get("DOI"),
+                "title": paper.get("title"),
+                "abstract": paper.get("abstract"),
+                "authors": authors,
+                "year": paper.get("year"),
+                "venue": paper.get("venue"),
+                "citations": paper.get("citationCount", 0),
+                "url": paper.get("url"),
+                "scholar_id": paper.get("paperId"),
+                "doi": external_ids.get("DOI"),
                 "source_query": query,
             }
             if article["title"]:
                 producer.send("raw-articles", value=article)
                 count += 1
-            if count >= 20:  # Limit per query per run
-                break
-            time.sleep(2)
-        except Exception as e:
-            print(f"Error on result: {e}")
+
+        if "next" not in payload:
+            break
+        offset = payload["next"]
+        time.sleep(1)
 
     producer.flush()
     print(f"Published {count} articles for query: {query}")

@@ -9,7 +9,7 @@ PaperBridge takes any Google Scholar article URL and returns ranked recommendati
 ```
 PaperBridge/
 ├── services/
-│   ├── scraper/        Python — scholarly (HTTP) → Kafka
+│   ├── scraper/        Python — Semantic Scholar API → Kafka
 │   ├── processor/      Python — NLP pipeline → FAISS + Elasticsearch + Postgres
 │   ├── api/            Python — FastAPI REST + Strawberry GraphQL + Redis cache
 │   └── worker/         Python — Celery async ingestion tasks
@@ -31,11 +31,11 @@ PaperBridge/
 ## Services
 
 ### scraper (`services/scraper/`)
-- Uses `scholarly` to query Google Scholar over HTTP (no browser engine — `playwright`/`chromium` removed to slim the image)
+- Queries the **Semantic Scholar Graph API** (`/graph/v1/paper/search`) over HTTP — official, documented API; no browser engine, no Google Scholar scraping, no proxy/Tor
 - Publishes raw article dicts to Kafka topic `raw-articles`
-- Rate-limited with configurable delay (`SCRAPE_DELAY_SECONDS`); optional Tor proxy
+- Paginates via the API cursor up to `MAX_RESULTS_PER_QUERY`, sleeping `REQUEST_DELAY_SECONDS` between pages; optional `SEMANTIC_SCHOLAR_API_KEY` lifts the rate limit
 - Entry point: `app/main.py` — iterates `SEED_QUERIES`, calls `fetch_articles()`, publishes via `publish_raw_article()`
-- Key files: `scholar_scraper.py` (scraping), `producer.py` (Kafka), `config.py`
+- Key files: `semantic_scholar.py` (API client), `producer.py` (Kafka), `config.py`
 
 ### processor (`services/processor/`)
 - Kafka consumer: reads `raw-articles`, runs NLP pipeline, writes to ES + FAISS + Postgres
@@ -69,7 +69,7 @@ PaperBridge/
 ### worker (`services/worker/`)
 - Celery app backed by Redis broker (`redis://redis:6379/1`) and result backend (`redis://redis:6379/2`)
 - Task routes: `ingest_article_task` → queue `ingestion`; `reindex_all_task` → queue `maintenance`
-- `ingest_article_task`: scrape via scholarly → `process_article()` → ES index → FAISS add; retries 3×
+- `ingest_article_task`: fetch from Semantic Scholar (DOI lookup if given, else query search) → `process_article()` → ES index → FAISS add; retries 3×
 - `reindex_all_task`: stub for full FAISS rebuild from ES (scroll all docs, re-embed)
 - Key files: `celery_app.py`, `tasks.py`
 
@@ -102,7 +102,7 @@ User submits Scholar URL or query text
                                               [Frontend: CitationGraph + Results list]
 
 Background ingestion (triggered via POST /articles/ingest or Airflow DAG):
-[scholarly scrape] → [Kafka raw-articles] → [processor: NLP + embed] → [ES + FAISS + Postgres]
+[Semantic Scholar API] → [Kafka raw-articles] → [processor: NLP + embed] → [ES + FAISS + Postgres]
 ```
 
 ---
@@ -148,12 +148,12 @@ The Python service images were ~9 GB each. They are now ~2.3–2.65 GB (scraper 
 - **Multi-stage build** — `build-essential` and pip downloads live only in the `builder` stage; the `runtime` stage copies just the `/opt/venv` virtualenv, so the compiler toolchain never ships.
 - **CPU-only torch** — `sentence-transformers` (api, processor, worker) otherwise pulls the default CUDA `torch` (~5 GB of `nvidia-*` wheels). Each Dockerfile installs `torch==2.2.2` from `https://download.pytorch.org/whl/cpu` **before** `requirements.txt`, so the CUDA build is never fetched. This was the bulk of the bloat.
 - **BuildKit pip cache mount** (`--mount=type=cache,target=/root/.cache/pip`) — caches downloads across rebuilds without adding to the image layer. Requires BuildKit (default in modern Docker Desktop and GitHub Actions).
-- **Dead deps removed** — processor: `mlflow` (it's a standalone service, never imported); scraper: `playwright`, `scrapy`, `boto3`, `bdfparser`, apt `chromium`/`chromium-driver` (none imported — `scholarly` works over HTTP); worker: `playwright`, `flower`.
+- **Dead deps removed** — processor: `mlflow` (it's a standalone service, never imported); scraper: `playwright`, `scrapy`, `boto3`, `bdfparser`, apt `chromium`/`chromium-driver` (none imported — the Semantic Scholar API is a plain HTTP call); worker: `playwright`, `flower`.
 
 **docker-compose.yml** — `model_cache` volume now mounted on `api` and `worker` (not just `processor`) so the `all-MiniLM-L6-v2` weights aren't re-downloaded on every container start; `worker` also gained the shared `faiss_data` volume so its FAISS writes land on the same index as `api`/`processor`.
 
 > If a build fails with a `--mount` parse error, BuildKit is disabled — run with `DOCKER_BUILDKIT=1 docker build ...` (or use `docker buildx`).
-> If the `playwright`/browser stack is needed later (e.g. switching `scholarly` to a Selenium proxy backend), restore it in `services/scraper/requirements.txt` and the Dockerfile.
+> If a browser-based data source is ever needed (e.g. a `playwright`/Selenium scraper), restore the browser stack in `services/scraper/requirements.txt` and the Dockerfile.
 
 ---
 
@@ -202,8 +202,9 @@ query {
 | `FAISS_INDEX_PATH` | `/data/faiss/articles.index` | Shared Docker volume |
 | `FAISS_DIMENSION` | `384` | Must match embedding model output |
 | `KAFKA_BOOTSTRAP_SERVERS` | `kafka:9092` | Scraper → processor |
-| `SCHOLAR_USE_PROXY` | `false` | Set `true` to route through Tor |
-| `SCRAPE_DELAY_SECONDS` | `2` | Rate limit for Scholar requests |
+| `SEMANTIC_SCHOLAR_API_KEY` | *(optional)* | Lifts Semantic Scholar rate limit |
+| `MAX_RESULTS_PER_QUERY` | `20` | Max articles fetched per seed query |
+| `REQUEST_DELAY_SECONDS` | `1` | Delay between Semantic Scholar API pages |
 | `API_CORS_ORIGINS` | `http://localhost:3000` | Comma-separated allowed origins |
 
 ---
@@ -226,7 +227,7 @@ make clean         # docker compose down -v + clean pycache
 
 | Layer | Technology |
 |---|---|
-| Scraping | `scholarly`, `playwright`, `tenacity` |
+| Scraping | Semantic Scholar Graph API (`requests`, `tenacity`) |
 | Messaging | Apache Kafka (Confluent 7.6) |
 | Orchestration | Apache Airflow 2.9 |
 | NLP / Embeddings | `sentence-transformers` (all-MiniLM-L6-v2), `KeyBERT`, `spaCy` |

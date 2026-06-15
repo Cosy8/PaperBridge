@@ -26,7 +26,7 @@ User submits a Scholar URL or query text
                               [Frontend: ranked list + citation graph]
 
 Background ingestion (POST /articles/ingest or the Airflow DAG):
-[scholarly scrape] → [Kafka raw-articles] → [processor: NLP + embed] → [Elasticsearch + FAISS + Postgres]
+[Semantic Scholar API] → [Kafka raw-articles] → [processor: NLP + embed] → [Elasticsearch + FAISS + Postgres]
 ```
 
 **Why RRF?** FAISS inner-product distances and Elasticsearch BM25 scores live on incomparable scales. RRF ranks rather than scores, so no normalization is needed, and it naturally boosts papers that appear in both result sets.
@@ -38,7 +38,7 @@ Background ingestion (POST /articles/ingest or the Airflow DAG):
 ```
 PaperBridge/
 ├── services/
-│   ├── scraper/    Python — scholarly (HTTP) → Kafka
+│   ├── scraper/    Python — Semantic Scholar API → Kafka
 │   ├── processor/  Python — NLP pipeline → FAISS + Elasticsearch + Postgres
 │   ├── api/        Python — FastAPI REST + Strawberry GraphQL + Redis cache
 │   └── worker/     Python — Celery async ingestion tasks
@@ -52,7 +52,7 @@ PaperBridge/
 
 | Layer | Technology |
 |---|---|
-| Scraping | `scholarly`, `tenacity` |
+| Scraping | Semantic Scholar API (`requests`, `tenacity`) |
 | Messaging | Apache Kafka |
 | NLP / Embeddings | `sentence-transformers` (all-MiniLM-L6-v2), KeyBERT, spaCy |
 | Vector search | FAISS IVFFlat (384-dim, inner product) |
@@ -170,7 +170,8 @@ Common tunables (with defaults):
 | `FAISS_INDEX_PATH` | `/data/faiss/articles.index` | Shared Docker volume |
 | `FAISS_DIMENSION` | `384` | Must match embedding model output |
 | `KAFKA_BOOTSTRAP_SERVERS` | `kafka:9092` | Scraper → processor |
-| `SCRAPE_DELAY_SECONDS` | `2` | Scholar rate limit |
+| `SEMANTIC_SCHOLAR_API_KEY` | *(optional)* | Lifts Semantic Scholar rate limit |
+| `REQUEST_DELAY_SECONDS` | `1` | Delay between API pages |
 | `API_CORS_ORIGINS` | `http://localhost:3000` | Comma-separated allowed origins |
 
 See `.env.example` for the full list.

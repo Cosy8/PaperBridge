@@ -1,19 +1,18 @@
 from loguru import logger
 
+from app.config import settings
 from app.producer import get_producer, publish_raw_article
-from app.scholar_scraper import fetch_articles, setup_proxy
+from app.semantic_scholar import fetch_articles
 
-SEED_QUERIES = [
-    "transformer neural network attention mechanism",
-    "large language model fine-tuning",
-    "graph neural network recommendation system",
-]
 
 def main():
     logger.info("PaperBridge Scraper starting...")
-    setup_proxy()
+    queries = [q.strip() for q in settings.seed_queries.split(",") if q.strip()]
+    if not queries:
+        logger.warning("No SEED_QUERIES configured; nothing to scrape. Exiting.")
+        return
     producer = get_producer()
-    for query in SEED_QUERIES:
+    for query in queries:
         logger.info(f"Scraping: {query}")
         try:
             for article in fetch_articles(query):

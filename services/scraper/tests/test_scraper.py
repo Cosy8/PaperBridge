@@ -38,41 +38,47 @@ class TestKafkaProducer:
         assert call_kwargs[1]["key"] == "No DOI Article"
 
 
-class TestScholarScraper:
-    def test_fetch_articles_yields_dicts(self):
-        from app.scholar_scraper import fetch_articles
+class TestSemanticScholarClient:
+    def test_fetch_articles_maps_api_response(self):
+        from app.semantic_scholar import fetch_articles
 
-        mock_filled = {
-            "bib": {
-                "title": "Test Paper",
-                "abstract": "Test abstract text",
-                "author": ["Author One", "Author Two"],
-                "pub_year": "2023",
-                "venue": "NeurIPS",
-            },
-            "num_citations": 100,
-            "pub_url": "https://example.com/paper",
-            "scholar_id": "abc123",
-            "externalids": {"DOI": "10.1234/test"},
+        page = {
+            "data": [
+                {
+                    "title": "Test Paper",
+                    "abstract": "Test abstract text",
+                    "authors": [{"name": "Author One"}, {"name": "Author Two"}],
+                    "year": 2023,
+                    "venue": "NeurIPS",
+                    "citationCount": 100,
+                    "url": "https://example.com/paper",
+                    "paperId": "abc123",
+                    "externalIds": {"DOI": "10.1234/test"},
+                }
+            ]
+            # no "next" key → single page, generator stops
         }
 
-        with patch("app.scholar_scraper.scholarly") as mock_scholarly, \
-             patch("app.scholar_scraper.time.sleep"):
-            mock_scholarly.search_pubs.return_value = iter([mock_filled])
-            mock_scholarly.fill.return_value = mock_filled
-
+        with patch("app.semantic_scholar._search_page", return_value=page), \
+             patch("app.semantic_scholar.time.sleep"):
             results = list(fetch_articles("test query"))
 
         assert len(results) == 1
         assert results[0]["title"] == "Test Paper"
+        assert results[0]["authors"] == ["Author One", "Author Two"]
         assert results[0]["doi"] == "10.1234/test"
+        assert results[0]["scholar_id"] == "abc123"
         assert results[0]["citations"] == 100
 
-    def test_setup_proxy_skipped_when_disabled(self):
-        from app.scholar_scraper import setup_proxy
+    def test_fetch_articles_handles_missing_optional_fields(self):
+        from app.semantic_scholar import fetch_articles
 
-        with patch("app.scholar_scraper.settings") as mock_settings, \
-             patch("app.scholar_scraper.scholarly") as mock_scholarly:
-            mock_settings.scholar_use_proxy = False
-            setup_proxy()
-            mock_scholarly.use_proxy.assert_not_called()
+        page = {"data": [{"title": "Sparse Paper", "paperId": "x1"}]}
+
+        with patch("app.semantic_scholar._search_page", return_value=page), \
+             patch("app.semantic_scholar.time.sleep"):
+            results = list(fetch_articles("q"))
+
+        assert results[0]["doi"] is None
+        assert results[0]["authors"] == []
+        assert results[0]["citations"] == 0
