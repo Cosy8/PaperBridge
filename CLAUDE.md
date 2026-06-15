@@ -1,6 +1,6 @@
 # PaperBridge — Developer Reference
 
-PaperBridge takes any Google Scholar article URL and returns ranked recommendations for related papers. It uses a hybrid ranking system combining BERT-based semantic embeddings (FAISS ANN) with full-text keyword search (Elasticsearch), fused via Reciprocal Rank Fusion (RRF). Results are displayed in an interactive D3.js citation graph.
+PaperBridge takes a query (free-text topic or an existing article ID) and returns ranked recommendations for related papers. Article metadata is sourced from the **Semantic Scholar Graph API** (not by scraping Google Scholar). It uses a hybrid ranking system combining BERT-based semantic embeddings (FAISS ANN) with full-text keyword search (Elasticsearch), fused via Reciprocal Rank Fusion (RRF). Results are displayed in an interactive D3.js citation graph.
 
 ---
 
@@ -34,7 +34,7 @@ PaperBridge/
 - Queries the **Semantic Scholar Graph API** (`/graph/v1/paper/search`) over HTTP — official, documented API; no browser engine, no Google Scholar scraping, no proxy/Tor
 - Publishes raw article dicts to Kafka topic `raw-articles`
 - Paginates via the API cursor up to `MAX_RESULTS_PER_QUERY`, sleeping `REQUEST_DELAY_SECONDS` between pages; optional `SEMANTIC_SCHOLAR_API_KEY` lifts the rate limit
-- Entry point: `app/main.py` — iterates `SEED_QUERIES`, calls `fetch_articles()`, publishes via `publish_raw_article()`
+- Entry point: `app/main.py` — reads queries from the `SEED_QUERIES` env var (comma-separated; **empty by default** — no baked-in seed data), calls `fetch_articles()`, publishes via `publish_raw_article()`. Exits with a warning if no queries are configured
 - Key files: `semantic_scholar.py` (API client), `producer.py` (Kafka), `config.py`
 
 ### processor (`services/processor/`)
@@ -69,9 +69,9 @@ PaperBridge/
 ### worker (`services/worker/`)
 - Celery app backed by Redis broker (`redis://redis:6379/1`) and result backend (`redis://redis:6379/2`)
 - Task routes: `ingest_article_task` → queue `ingestion`; `reindex_all_task` → queue `maintenance`
-- `ingest_article_task`: fetch from Semantic Scholar (DOI lookup if given, else query search) → `process_article()` → ES index → FAISS add; retries 3×
+- `ingest_article_task`: fetch from Semantic Scholar (exact `/paper/DOI:<doi>` lookup if a `doi` is given, else first hit from `/paper/search` on `query`) → `process_article()` → ES index → FAISS add; retries 3×. **Note:** the `url` field of the ingest request is currently ignored — only `doi` and `query` are resolved
 - `reindex_all_task`: stub for full FAISS rebuild from ES (scroll all docs, re-embed)
-- Key files: `celery_app.py`, `tasks.py`
+- Key files: `celery_app.py`, `tasks.py`, `semantic_scholar.py` (S2 API client), `config.py`
 
 ### frontend (`frontend/`)
 - Next.js 14 App Router, TailwindCSS dark theme (`slate-950` background, `emerald-400` accent)
@@ -85,7 +85,7 @@ PaperBridge/
 ## Data Flow
 
 ```
-User submits Scholar URL or query text
+User submits query text (or an existing article ID)
         │
         ▼
 [API: POST /recommendations/]
@@ -167,7 +167,8 @@ POST /api/v1/recommendations/
 GET  /api/v1/search/?q=transformer&year_from=2020&size=20
 
 POST /api/v1/articles/ingest
-  Body: {"url": "...", "doi": "...", "query": "..."}
+  Body: {"doi": "...", "query": "..."}   (worker resolves by doi first, else query)
+  Note: `url` is accepted by the API schema but ignored by the worker
 
 GET  /api/v1/articles/task/{task_id}
 
@@ -205,6 +206,7 @@ query {
 | `SEMANTIC_SCHOLAR_API_KEY` | *(optional)* | Lifts Semantic Scholar rate limit |
 | `MAX_RESULTS_PER_QUERY` | `20` | Max articles fetched per seed query |
 | `REQUEST_DELAY_SECONDS` | `1` | Delay between Semantic Scholar API pages |
+| `SEED_QUERIES` | *(empty)* | Comma-separated queries for scraper + Airflow DAG; empty = ingest nothing |
 | `API_CORS_ORIGINS` | `http://localhost:3000` | Comma-separated allowed origins |
 
 ---
@@ -252,7 +254,7 @@ make clean         # docker compose down -v + clean pycache
 
 **Why FAISS IVFFlat over pgvector?** At 1M+ vectors, IVFFlat is 10–100× faster per query. pgvector is the right choice below ~100k vectors.
 
-**Why Kafka between scraper and processor?** The scraper is I/O-bound at ~0.5 articles/second (Scholar rate limits). The processor can handle ~200 articles/second. Kafka decouples them and enables replayability — if the embedding model changes, re-process all messages from offset 0.
+**Why Kafka between scraper and processor?** The scraper is I/O-bound (Semantic Scholar's keyless pool is ~1 req/sec, shared globally; an API key raises this). The processor can handle ~200 articles/second. Kafka decouples them and enables replayability — if the embedding model changes, re-process all messages from offset 0.
 
 **Why Redis cache with MD5 key?** Recommendations are deterministic for a given (query, top_k, method) tuple. The corpus changes slowly, so a 1-hour TTL is appropriate. Cache invalidation on article deletion happens naturally via TTL expiry.
 

@@ -10,6 +10,7 @@ dict shape the NLP pipeline expects. Supports two lookup modes:
 Docs: https://api.semanticscholar.org/api-docs/graph
 """
 
+import contextlib
 import time
 
 import requests
@@ -48,12 +49,12 @@ def _headers() -> dict:
     return {}
 
 
-class RateLimited(Exception):
+class RateLimitedError(Exception):
     """Raised on HTTP 429 so tenacity retries with a long, header-aware backoff."""
 
 
 @retry(
-    retry=retry_if_exception_type(RateLimited),
+    retry=retry_if_exception_type(RateLimitedError),
     stop=stop_after_attempt(6),
     wait=wait_exponential(multiplier=2, min=5, max=60),
     reraise=True,
@@ -74,12 +75,10 @@ def _get(path: str, params: dict) -> dict | None:
     if resp.status_code == 429:
         retry_after = resp.headers.get("Retry-After")
         if retry_after:
-            try:
+            with contextlib.suppress(ValueError):
                 time.sleep(min(float(retry_after), 60))
-            except ValueError:
-                pass
         logger.warning(f"Rate limited (429) on {path}; retrying")
-        raise RateLimited()
+        raise RateLimitedError
 
     resp.raise_for_status()
     return resp.json()

@@ -5,9 +5,11 @@ Orchestrates: seed query scraping → Kafka publish → processor trigger → in
 """
 import os
 from datetime import datetime, timedelta
-from airflow import DAG
-from airflow.operators.python import PythonOperator
+
 from airflow.operators.bash import BashOperator
+from airflow.operators.python import PythonOperator
+
+from airflow import DAG
 
 DEFAULT_ARGS = {
     "owner": "paperbridge",
@@ -26,7 +28,7 @@ S2_FIELDS = "title,abstract,authors,year,venue,citationCount,externalIds,url,pap
 S2_SEARCH_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
 
 
-class _RateLimited(Exception):
+class _RateLimitedError(Exception):
     """Raised on HTTP 429 so tenacity retries with a long, header-aware backoff."""
 
 
@@ -35,6 +37,7 @@ def _search_page(query: str, offset: int, limit: int) -> dict:
 
     Mirrors the scraper/worker clients (separate images can't share a module).
     """
+    import contextlib
     import os
     import time
 
@@ -52,7 +55,7 @@ def _search_page(query: str, offset: int, limit: int) -> dict:
         headers["x-api-key"] = api_key
 
     @retry(
-        retry=retry_if_exception_type(_RateLimited),
+        retry=retry_if_exception_type(_RateLimitedError),
         stop=stop_after_attempt(6),
         wait=wait_exponential(multiplier=2, min=5, max=60),
         reraise=True,
@@ -67,12 +70,10 @@ def _search_page(query: str, offset: int, limit: int) -> dict:
         if resp.status_code == 429:
             retry_after = resp.headers.get("Retry-After")
             if retry_after:
-                try:
+                with contextlib.suppress(ValueError):
                     time.sleep(min(float(retry_after), 60))
-                except ValueError:
-                    pass
             print(f"Rate limited (429) on '{query}' @ offset {offset}; retrying")
-            raise _RateLimited()
+            raise _RateLimitedError
         resp.raise_for_status()
         return resp.json()
 

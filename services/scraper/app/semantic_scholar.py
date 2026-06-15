@@ -10,6 +10,7 @@ documented API (abstracts, citation counts, external IDs, author lists) with a
 clear usage policy — no ToS breach, no proxy/Tor evasion, better data quality.
 Docs: https://api.semanticscholar.org/api-docs/graph
 """
+import contextlib
 import time
 from collections.abc import Generator
 
@@ -62,12 +63,12 @@ def _to_article(paper: dict) -> dict:
     }
 
 
-class RateLimited(Exception):
+class RateLimitedError(Exception):
     """Raised on HTTP 429 so tenacity retries with a long, header-aware backoff."""
 
 
 @retry(
-    retry=retry_if_exception_type(RateLimited),
+    retry=retry_if_exception_type(RateLimitedError),
     # Semantic Scholar's keyless pool is ~1 req/sec shared globally, so 429s are
     # common. Back off generously and try several times before giving up.
     stop=stop_after_attempt(6),
@@ -90,12 +91,10 @@ def _search_page(query: str, offset: int, limit: int) -> dict:
         # Honor Retry-After when present, otherwise let tenacity's backoff handle it.
         retry_after = resp.headers.get("Retry-After")
         if retry_after:
-            try:
+            with contextlib.suppress(ValueError):
                 time.sleep(min(float(retry_after), 60))
-            except ValueError:
-                pass
         logger.warning(f"Rate limited (429) on '{query}' @ offset {offset}; retrying")
-        raise RateLimited()
+        raise RateLimitedError
 
     resp.raise_for_status()
     return resp.json()
