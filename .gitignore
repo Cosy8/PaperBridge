@@ -229,6 +229,9 @@ minio-data/
 # ── Model cache (sentence-transformers / HuggingFace) ───────────
 .cache/huggingface/
 models/
+# but DO track the API's SQLAlchemy ORM source package (not an ML artifact dir)
+!services/api/app/models/
+!services/api/app/models/*.py
 *.bin
 *.pt
 *.safetensors

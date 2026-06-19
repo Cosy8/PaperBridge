@@ -1,8 +1,11 @@
 fastapi==0.116.1
 uvicorn[standard]==0.29.0
-# Pinned explicitly (transitive via fastapi) to pull the patched release —
-# CVE-2024-47874 (DoS) and CVE-2025-54121. Requires fastapi>=0.116.
-starlette==0.47.2
+# Latest starlette within fastapi 0.116's allowed range (<0.48). NOTE: starlette
+# has open CVEs (CVE-2025-62727, CVE-2026-48817/48818, CVE-2026-54282/54283)
+# whose fixes land in 0.49.1/1.3.1 — those require FastAPI >=0.137, which in turn
+# breaks prometheus-fastapi-instrumentator's routing hook. Deferred until the
+# metrics middleware supports FastAPI 0.137+. Tracked as a follow-up.
+starlette==0.47.3
 strawberry-graphql[fastapi]==0.315.7
 sqlalchemy==2.0.29
 psycopg2-binary==2.9.9
@@ -22,5 +25,5 @@ faiss-cpu==1.8.0
 numpy==1.26.4
 python-jose[cryptography]==3.4.0
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.27
+python-multipart==0.0.32
 httpx==0.27.0
