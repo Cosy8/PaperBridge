@@ -1,9 +1,11 @@
 """SQLAlchemy ORM models."""
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, Float, DateTime, JSON, Text, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
+
+from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+
 from app.db.base import Base
 
 
