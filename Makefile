@@ -19,13 +19,6 @@ logs:
 ps:
 	docker compose ps
 
-# ── Database ────────────────────────────────────────────────────
-migrate:
-	docker compose exec api alembic upgrade head
-
-migrate-create:
-	docker compose exec api alembic revision --autogenerate -m "$(name)"
-
 # ── Development ─────────────────────────────────────────────────
 install:
 	pip install -r services/api/requirements.txt
@@ -67,16 +60,6 @@ recommend:
 mlflow-experiments:
 	docker compose --profile mlflow up -d mlflow
 	docker compose exec mlflow python /mlflow/run_experiments.py
-
-# ── Kubernetes ──────────────────────────────────────────────────
-k8s-apply:
-	kubectl apply -f infrastructure/k8s/ -n paperbridge
-
-k8s-status:
-	kubectl get pods -n paperbridge
-
-helm-install:
-	helm upgrade --install paperbridge ./infrastructure/helm/ -n paperbridge --create-namespace
 
 # ── Cleanup ─────────────────────────────────────────────────────
 clean:

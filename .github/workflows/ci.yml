@@ -41,12 +41,18 @@ jobs:
         continue-on-error: true
 
       - name: Run tests
+        env:
+          # Dummy values so each service's module-level `Settings()` constructs
+          # at import time. Tests mock all external clients; nothing connects.
+          POSTGRES_URL: postgresql://test:test@localhost:5432/test
+          API_SECRET_KEY: test-secret-key
+          MINIO_ACCESS_KEY: test
+          MINIO_SECRET_KEY: test
         run: |
           pytest services/${{ matrix.service }}/tests/ \
             --cov=services/${{ matrix.service }}/app \
             --cov-report=xml \
             -v
-        continue-on-error: true
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4

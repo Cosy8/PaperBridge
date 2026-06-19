@@ -25,7 +25,7 @@ cp .env.example .env
 # Edit .env and replace every CHANGE_ME value
 ```
 
-### Production (GitHub Actions / k8s)
+### Production deployment
 
 Store all secrets in **GitHub Actions Secrets** (Settings → Secrets and variables → Actions) or a Kubernetes Secret / external secrets manager (Vault, AWS Secrets Manager). Never pass secrets as plain environment variables in public CI logs.
 

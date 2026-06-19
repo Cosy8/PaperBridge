@@ -9,12 +9,12 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt .
 # CPU-only torch first (sentence-transformers/keybert pull torch); avoids the
-# default CUDA build. The spaCy model installs into the venv as a wheel and is
-# carried over by the venv copy below.
+# default CUDA build. The spaCy model (en_core_web_sm) is pinned in
+# requirements.txt as a wheel, so it installs into the venv and is carried over
+# by the venv copy below.
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu \
-    && pip install -r requirements.txt \
-    && python -m spacy download en_core_web_sm
+    && pip install -r requirements.txt
 
 # ── Runtime ─────────────────────────────────────────────────────
 FROM python:3.11-slim AS runtime

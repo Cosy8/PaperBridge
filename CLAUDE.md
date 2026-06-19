@@ -19,7 +19,7 @@ PaperBridge/
 ├── infrastructure/
 │   ├── postgres/       init.sql schema (articles, recommendations, search_queries)
 │   └── monitoring/     prometheus.yml, otel-collector.yml
-├── .github/workflows/  GitHub Actions CI/CD (lint → test → build → k3s deploy)
+├── .github/workflows/  GitHub Actions CI (per-service ruff lint + pytest; mypy soft)
 ├── docker-compose.yml  All services; optional profiles: airflow, mlflow, monitoring
 ├── Makefile            Common dev commands
 ├── pyproject.toml      ruff + mypy + pytest config
@@ -112,7 +112,8 @@ Background ingestion (triggered via POST /articles/ingest or Airflow DAG):
 ```bash
 cp .env.example .env
 docker compose up -d
-docker compose exec api alembic upgrade head
+# Postgres schema is auto-created on first boot from
+# infrastructure/postgres/init.sql (mounted into docker-entrypoint-initdb.d).
 
 # Ingest some articles
 make ingest query="attention mechanism transformer"
@@ -218,7 +219,6 @@ make test          # pytest all services
 make lint          # ruff check
 make format        # ruff format
 make typecheck     # mypy api + processor
-make migrate       # alembic upgrade head (inside api container)
 make build         # docker compose build --parallel
 make clean         # docker compose down -v + clean pycache
 ```
@@ -235,7 +235,7 @@ make clean         # docker compose down -v + clean pycache
 | NLP / Embeddings | `sentence-transformers` (all-MiniLM-L6-v2), `KeyBERT`, `spaCy` |
 | Vector search | FAISS IVFFlat (384-dim, inner product) |
 | Full-text search | Elasticsearch 8.13 (BM25, English analyzer) |
-| Metadata store | PostgreSQL 16 (SQLAlchemy ORM, Alembic migrations) |
+| Metadata store | PostgreSQL 16 (SQLAlchemy ORM; schema from init.sql) |
 | Object store | MinIO (S3-compatible; raw HTML, model artifacts) |
 | Ranking | Reciprocal Rank Fusion (k=60) |
 | API | FastAPI 0.111 + Strawberry GraphQL |
@@ -244,7 +244,7 @@ make clean         # docker compose down -v + clean pycache
 | Experiment tracking | MLflow 2.12 |
 | Frontend | Next.js 14, D3.js, TailwindCSS, TanStack Query |
 | Observability | Prometheus, Grafana, OpenTelemetry (OTLP → Jaeger) |
-| CI/CD | GitHub Actions → Docker → k3s + Helm |
+| CI | GitHub Actions (per-service ruff + pytest) |
 
 ---
 

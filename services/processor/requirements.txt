@@ -1,5 +1,8 @@
 kafka-python==2.0.2
 spacy==3.8.14
+# spaCy NER model — pinned as a wheel so `pip install -r` provides it in CI and
+# the Docker build alike (en_core_web_sm tracks the spaCy 3.8.x line).
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
 keybert==0.8.4
 sentence-transformers==2.7.0
 faiss-cpu==1.8.0

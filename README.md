@@ -45,7 +45,7 @@ PaperBridge/
 ├── frontend/       TypeScript — Next.js 14 + D3.js + TailwindCSS
 ├── airflow/dags/   Python — daily scheduled scraping DAG
 ├── mlflow/         Python — embedding model evaluation experiments
-├── infrastructure/ Postgres schema, Prometheus/OTel config, k8s/Helm
+├── infrastructure/ Postgres schema (init.sql), Prometheus/OTel config
 ├── docker-compose.yml   All services; optional profiles: airflow, mlflow, monitoring
 └── .env.example
 ```
@@ -57,7 +57,7 @@ PaperBridge/
 | NLP / Embeddings | `sentence-transformers` (all-MiniLM-L6-v2), KeyBERT, spaCy |
 | Vector search | FAISS IVFFlat (384-dim, inner product) |
 | Full-text search | Elasticsearch 8.13 (BM25) |
-| Metadata store | PostgreSQL 16 (SQLAlchemy + Alembic) |
+| Metadata store | PostgreSQL 16 (SQLAlchemy ORM) |
 | Object store | MinIO (S3-compatible) |
 | API | FastAPI + Strawberry GraphQL |
 | Cache | Redis 7 (1h TTL) |
@@ -74,7 +74,8 @@ PaperBridge/
 ```bash
 cp .env.example .env          # fill in the required secrets (see below)
 docker compose up -d          # postgres, redis, kafka, elasticsearch, api, processor, worker, frontend
-docker compose exec api alembic upgrade head   # or: make migrate
+# The Postgres schema is created automatically on first boot from
+# infrastructure/postgres/init.sql (mounted into docker-entrypoint-initdb.d).
 
 # Ingest some articles
 make ingest query="attention mechanism transformer"
@@ -185,7 +186,6 @@ make test          # pytest all services
 make lint          # ruff check
 make format        # ruff format
 make typecheck     # mypy api + processor
-make migrate       # alembic upgrade head (inside api container)
 make build         # docker compose build --parallel
 make clean         # docker compose down -v + clean pycache
 ```

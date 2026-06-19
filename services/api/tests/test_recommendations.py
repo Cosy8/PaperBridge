@@ -45,24 +45,31 @@ def mock_recommendations():
 @pytest.mark.asyncio
 async def test_recommend_by_query(mock_recommendations):
     """Test POST /recommendations/ with query_text."""
-    with patch("app.routers.recommendations.get_redis") as mock_redis, \
-         patch("app.services.recommender.get_recommendations") as mock_recs:
+    from app.db.session import get_db
+    from app.routers.recommendations import get_redis
+    from app.schemas.recommendation import RecommendationResponse
 
-        redis_instance = MagicMock()
-        redis_instance.get.return_value = None
-        mock_redis.return_value = redis_instance
+    redis_instance = MagicMock()
+    redis_instance.get.return_value = None  # cache miss
 
-        from app.schemas.recommendation import RecommendationResponse
+    app.dependency_overrides[get_redis] = lambda: redis_instance
+    app.dependency_overrides[get_db] = lambda: MagicMock()
+
+    # The router binds `get_recommendations` at import, so patch it there.
+    with patch("app.routers.recommendations.get_recommendations") as mock_recs:
         mock_recs.return_value = [RecommendationResponse(**r) for r in mock_recommendations]
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.post(
-                "/api/v1/recommendations/",
-                json={"query_text": "transformer attention mechanism"},
-                params={"top_k": 10, "method": "hybrid"},
-            )
+        try:
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as client:
+                response = await client.post(
+                    "/api/v1/recommendations/",
+                    json={"query_text": "transformer attention mechanism"},
+                    params={"top_k": 10, "method": "hybrid"},
+                )
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == 200
         data = response.json()
@@ -76,11 +83,17 @@ async def test_recommend_by_query(mock_recommendations):
 async def test_recommend_returns_cached_result(mock_recommendations):
     """Test that cached results are returned from Redis."""
     import json
-    with patch("app.routers.recommendations.get_redis") as mock_redis:
-        redis_instance = MagicMock()
-        redis_instance.get.return_value = json.dumps(mock_recommendations)
-        mock_redis.return_value = redis_instance
 
+    from app.db.session import get_db
+    from app.routers.recommendations import get_redis
+
+    redis_instance = MagicMock()
+    redis_instance.get.return_value = json.dumps(mock_recommendations)  # cache hit
+
+    app.dependency_overrides[get_redis] = lambda: redis_instance
+    app.dependency_overrides[get_db] = lambda: MagicMock()
+
+    try:
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
@@ -88,9 +101,11 @@ async def test_recommend_returns_cached_result(mock_recommendations):
                 "/api/v1/recommendations/",
                 json={"query_text": "transformer"},
             )
+    finally:
+        app.dependency_overrides.clear()
 
-        assert response.status_code == 200
-        assert response.json()[0]["title"] == "Attention Is All You Need"
+    assert response.status_code == 200
+    assert response.json()[0]["title"] == "Attention Is All You Need"
 
 
 @pytest.mark.asyncio
