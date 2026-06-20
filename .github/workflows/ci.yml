@@ -31,6 +31,14 @@ jobs:
       - name: Install dependencies
         run: |
           pip install ruff mypy pytest pytest-cov pytest-asyncio
+          # Install CPU-only torch first for services that pull it transitively
+          # (sentence-transformers). Otherwise pip fetches the default CUDA build
+          # (~5GB of nvidia-* wheels), which is slow and can exhaust runner disk,
+          # leaving a partial install (e.g. a missing transitive dep). Mirrors the
+          # service Dockerfiles. See CLAUDE.md "Docker Image Optimization".
+          if grep -q "sentence-transformers" services/${{ matrix.service }}/requirements.txt; then
+            pip install torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu
+          fi
           pip install -r services/${{ matrix.service }}/requirements.txt
 
       - name: Ruff lint
