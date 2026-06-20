@@ -1,4 +1,7 @@
 kafka-python==2.0.2
+# Declared explicitly though it's transitive (spaCy→typer, huggingface-hub):
+# CI intermittently resolved a tree without it → "No module named 'click'".
+click>=8.1.7,<9
 spacy==3.8.14
 # spaCy NER model — pinned as a wheel so `pip install -r` provides it in CI and
 # the Docker build alike (en_core_web_sm tracks the spaCy 3.8.x line).
